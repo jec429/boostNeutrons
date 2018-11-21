@@ -33,7 +33,7 @@ class FeaturesGUI(tk.Tk):
 
         self.frames = {}
 
-        for F in (StartPage, PageOne, PageTwo, PageThree):
+        for F in (StartPage, PageOne, TablePage, PlotPage):
             frame = F(container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -55,20 +55,24 @@ class StartPage(tk.Frame):
         #button = ttk.Button(self, text="Visit Page 1",
         #                    command=lambda: controller.show_frame(PageOne))
         #button.pack()
+        
+        button2 = tk.Button(self, text="Table Page", command=lambda: controller.show_frame(TablePage))
+        #button2.grid(row = 0, column = 0)
+        button2.configure(height = 2, width = 20)
+        button2.place(relx=.35, rely=0.4, anchor="c")
+        
+        button3 = tk.Button(self, text="Plots Page",
+                            command=lambda: controller.show_frame(PlotPage))
+        #button3.grid(row = 0, column = 1)
+        button3.configure(height = 2, width = 20)
+        button3.place(relx=.65, rely=0.4, anchor="c")
 
-        button2 = ttk.Button(self, text="Table Page",
-                            command=lambda: controller.show_frame(PageTwo))
-        button2.pack()
-
-        button3 = ttk.Button(self, text="Plots Page",
-                            command=lambda: controller.show_frame(PageThree))
-        button3.pack()
-
-        button4 = ttk.Button(self, text="Quit",
+        button4 = tk.Button(self, text="Quit",
                             command=self.quit)
-        button4.pack()
-
-
+        #button4.grid(column=0, row=1, columnspan=2, rowspan=1, sticky=(tk.N, tk.S, tk.E, tk.W))
+        button4.configure(height = 2, width = 40)
+        button4.place(relx=.5, rely=.5, anchor="c")
+        
 class PageOne(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -81,11 +85,11 @@ class PageOne(tk.Frame):
         button1.pack()
 
         button2 = ttk.Button(self, text="Page Two",
-                            command=lambda: controller.show_frame(PageTwo))
+                            command=lambda: controller.show_frame(TablePage))
         button2.pack()
 
 
-class PageTwo(tk.Frame):
+class TablePage(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
@@ -101,7 +105,7 @@ class PageTwo(tk.Frame):
         button1.pack()
 
         button3 = ttk.Button(self, text="Plots Page",
-                            command=lambda: controller.show_frame(PageThree))
+                            command=lambda: controller.show_frame(PlotPage))
         button3.pack()
 
         buttonN = ttk.Button(self, text="Next",
@@ -167,7 +171,6 @@ class PageTwo(tk.Frame):
         print('Table printed')
         f = open('prunedDump.csv','w')
         string = 'class,'
-        #print(len(data[0][1]))
         dt =  np.array(data[-1][1])[np.newaxis].T
         for n in data[:-1]:
             if n[2] == 1:
@@ -177,51 +180,61 @@ class PageTwo(tk.Frame):
                 dt = np.concatenate((dt,na.T),axis=1)
 
         string = string[:-1]+'\n'
-        #print(string)
         for d in dt:
-            #print(d)
             for e in d:
-                #print (e)
                 string += str(e)+','
             string = string[:-1]+'\n'
-            #print(len(d))
         f.write(string+'\n')
         f.close()
         
         
             
-class PageThree(tk.Frame):
+class PlotPage(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
+        #frame1 = tk.Frame(self,parent)
         label = tk.Label(self, text="PLOTS", font=LARGE_FONT)
         label.pack(pady=10,padx=10)
 
+        
         button1 = ttk.Button(self, text="Back to Home",
                             command=lambda: controller.show_frame(StartPage))
         button1.pack()
 
+        buttonT = ttk.Button(self, text="Table Page",
+                            command=lambda: controller.show_frame(TablePage))
 
         button2 = ttk.Button(self, text="Next",
                              command=self.updateFeature)
-        button2.pack()
+        #button2.pack()
 
         button3 = ttk.Button(self, text="Previous",
                              command=self.previousFeature)
-        button3.pack()
+        #button3.pack()
 
         button4 = ttk.Button(self, text="First",
                              command=self.firstFeature)
-        button4.pack()
+        #button4.pack()
 
         button5 = ttk.Button(self, text="Last",
                              command=self.lastFeature)
-        button5.pack()
+        #button5.pack()
 
-        buttonQ = ttk.Button(self, text="Quit",
-                            command=self.quit)
-        buttonQ.pack()
+        self.entry = tk.Entry(self)        
+        #self.entry.pack()
+        button6 = tk.Button(self, text="Get", command=self.jumpToFeature)
+        #button6.pack()
         
+        button7 = tk.Button(self, text="Change status", command=self.changeStatus)
+        #button7.pack()
+        
+        buttonQ = ttk.Button(self, text="Quit", command=self.quit)
+        #buttonQ.pack()
+
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
+        #self.Status.pack()
+
         self.widget = None
         if self.widget:
             self.widget.destroy()
@@ -232,8 +245,37 @@ class PageThree(tk.Frame):
         canvas.draw()
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
+
         h = 0
-                
+
+    def changeStatus(self):
+        global data
+        hhindex = int(self.entry.get())
+        data[hhindex][2] = 1 if data[hhindex][2] == 0 else 0
+        print("Feature status=",data[hhindex][2])
+        self.Status.destroy()
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hhindex][2]))
+        self.Status.pack()
+        
+        
+    def jumpToFeature(self):
+        #print(self.entry.get())
+        hhindex = int(self.entry.get())
+        self.Status.destroy()
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hhindex][2]))
+        self.Status.pack()
+        print("Feature status=",data[hhindex][2])
+        names = [n[0] for n in data]
+        h = histoFeature(data,names[hhindex])
+        if self.widget:
+            self.widget.destroy()
+        canvas = FigureCanvasTkAgg(h, self)
+        canvas.draw()
+        self.widget = canvas.get_tk_widget()
+        self.widget.pack(fill=tk.BOTH)
+        plt.close('all')
+
+        
     def updateFeature(self):
         global hindex
         #print(hindex)
@@ -262,6 +304,8 @@ class PageThree(tk.Frame):
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
+
 
     def firstFeature(self):
         global hindex
@@ -276,6 +320,8 @@ class PageThree(tk.Frame):
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
+
 
     def lastFeature(self):
         global hindex
@@ -290,6 +336,7 @@ class PageThree(tk.Frame):
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
 
         
 app = FeaturesGUI()
