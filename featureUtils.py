@@ -17,9 +17,10 @@ def readCSV(fname):
 def histoFeature(data,hname):
     n_bins = 20
     names = [n[0] for n in data]
-    x = [p for p,c in zip(data[findFeature(names,hname)][1], data[-1][1]) if c == 0 ]
-    y = [p for p,c in zip(data[findFeature(names,hname)][1], data[-1][1]) if c == 1 ]
-    z = [p for p,c in zip(data[findFeature(names,hname)][1], data[-1][1]) if c == 2 ]
+    dataF = data[findFeature(names,hname)]
+    x = [p for p,c in zip(dataF[1], data[-1][1]) if c == 0 ]
+    y = [p for p,c in zip(dataF[1], data[-1][1]) if c == 1 ]
+    z = [p for p,c in zip(dataF[1], data[-1][1]) if c == 2 ]
 
     fig, ax = plt.subplots()
 
