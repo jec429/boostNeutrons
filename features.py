@@ -10,7 +10,13 @@ import matplotlib.pyplot as plt
 
 from featureUtils import *
 
-data = readCSV('trainDump.csv')
+#test = readTXT('trainDump.csv')
+
+#data = readCSV('trainDump.csv')
+#data = readTXT('trainDump.csv')
+fname = 'trainDump.csv'
+data = readClasses('trainDump.csv')
+
 hindex = 0
 tindex = 0
 
@@ -25,12 +31,13 @@ class FeaturesGUI(tk.Tk):
 
         #tk.Tk.iconbitmap(self, default="clienticon.ico")
         tk.Tk.wm_title(self, "Neutron features")
-                
+        
         container = tk.Frame(self)
         container.pack(side="top", fill="both", expand = True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
-
+        #container.pack()
+        
         self.frames = {}
 
         for F in (StartPage, PageOne, TablePage, PlotPage):
@@ -146,8 +153,11 @@ class TablePage(tk.Frame):
         self.treeview = tv
 
     def LoadTable(self, tindex):
-        for i,d in enumerate(data[tindex*20:(tindex+1)*20]):
-            self.treeview.insert('', 'end', text=d[0], values=(tindex*20 + i, '%.3f' %np.mean(d[1]), '%.3f' %np.std(d[1]), u'\u2705' if d[2] == 1 else u'\u274C'))
+        ldata = []
+        #for l in range(tindex*20,(tindex+1)*20):
+        #    ldata.append(readData(fname,l))
+        for i,d in enumerate(data):
+            self.treeview.insert('', 'end', text=d.name, values=(tindex*20 + i, '%.3f' %d.mean, '%.3f' %d.STD, u'\u2705' if d.status == 1 else u'\u274C'))
 
     def nextTable(self):
         global tindex
@@ -167,8 +177,10 @@ class TablePage(tk.Frame):
     def DeleteUI(self):
         self.treeview.delete()
 
+        
     def printTable(self):
-        print('Table printed')
+        '''
+        print('Table printed')        
         f = open('prunedDump.csv','w')
         string = 'class,'
         dt =  np.array(data[-1][1])[np.newaxis].T
@@ -186,7 +198,8 @@ class TablePage(tk.Frame):
             string = string[:-1]+'\n'
         f.write(string+'\n')
         f.close()
-        
+        '''
+        print("NOT IMPLEMENTED")
         
             
 class PlotPage(tk.Frame):
@@ -194,68 +207,100 @@ class PlotPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         #frame1 = tk.Frame(self,parent)
-        label = tk.Label(self, text="PLOTS", font=LARGE_FONT)
-        label.pack(pady=10,padx=10)
-
-        
-        button1 = ttk.Button(self, text="Back to Home",
-                            command=lambda: controller.show_frame(StartPage))
-        button1.pack()
-
-        buttonT = ttk.Button(self, text="Table Page",
-                            command=lambda: controller.show_frame(TablePage))
-
-        button2 = ttk.Button(self, text="Next",
-                             command=self.updateFeature)
-        #button2.pack()
-
-        button3 = ttk.Button(self, text="Previous",
-                             command=self.previousFeature)
-        #button3.pack()
-
-        button4 = ttk.Button(self, text="First",
-                             command=self.firstFeature)
-        #button4.pack()
-
-        button5 = ttk.Button(self, text="Last",
-                             command=self.lastFeature)
-        #button5.pack()
-
-        self.entry = tk.Entry(self)        
-        #self.entry.pack()
-        button6 = tk.Button(self, text="Get", command=self.jumpToFeature)
-        #button6.pack()
-        
-        button7 = tk.Button(self, text="Change status", command=self.changeStatus)
-        #button7.pack()
-        
-        buttonQ = ttk.Button(self, text="Quit", command=self.quit)
-        #buttonQ.pack()
-
-        self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
-        #self.Status.pack()
+        label = tk.Label(self, text="", font=LARGE_FONT)
+        label.pack(pady=120,padx=10)
 
         self.widget = None
         if self.widget:
             self.widget.destroy()
 
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hindex])            
+        #names = [n[0] for n in data]
+        #h = histoFeature(fname,hindex)
+        h = data[hindex].histo
         canvas = FigureCanvasTkAgg(h, self)
         canvas.draw()
         self.widget = canvas.get_tk_widget()
-        self.widget.pack(fill=tk.BOTH)
+
+        self.widget.pack(fill=tk.BOTH)                
+
+        
+        button1 = ttk.Button(self, text="Back to Home",
+                            command=lambda: controller.show_frame(StartPage))
+        #button1.pack(side=tk.LEFT)
+        button1.place(relx=.4, rely=0.05, anchor="n")
+        buttonQ = ttk.Button(self, text="Quit", command=self.quit)
+        #buttonQ.pack()
+        buttonQ.place(relx=.6, rely=0.05, anchor="n")
+
+        buttonT = ttk.Button(self, text="Table Page",
+                            command=lambda: controller.show_frame(TablePage))
+        buttonT.place(relx=.5, rely=0.1, anchor="n")
+
+        button2 = ttk.Button(self, text="Next >",
+                             command=self.nextFeature)
+        #button2.pack()
+        button2.place(relx=.6, rely=0.15, anchor="n")
+
+        button3 = ttk.Button(self, text="< Previous",
+                             command=self.previousFeature)
+        #button3.pack()
+        button3.place(relx=.4, rely=0.15, anchor="n")
+
+        button4 = ttk.Button(self, text="<< First",
+                             command=self.firstFeature)
+        #button4.pack()
+        button4.place(relx=.4, rely=0.2, anchor="n")
+
+        button5 = ttk.Button(self, text="Last >>",
+                             command=self.lastFeature)
+        #button5.pack()
+        button5.place(relx=.6, rely=0.2, anchor="n")
+
+        labelF = tk.Label(self, text="Feature index=", font=LARGE_FONT)
+        labelF.place(relx=.35, rely=0.255, anchor="n")
+        self.entry = tk.Entry(self,width=10)
+        self.entry.insert(0,'0')
+        #self.entry.pack()
+        self.entry.place(relx=.5, rely=0.25, anchor="n")
+        button6 = tk.Button(self, text="Get", command=self.jumpToFeature)
+        #button6.pack()
+        button6.place(relx=.6, rely=0.255, anchor="n")
+        
+        button7 = tk.Button(self, text="Change status", command=self.changeStatus)
+        #button7.pack()
+        button7.place(relx=.6, rely=0.3, anchor="n")
+
+        button8 = tk.Button(self, text="Get status", command=self.getStatus)
+        #button7.pack()
+        button8.place(relx=.4, rely=0.3, anchor="n")
+        
+
+        #self.Status = tk.Label(self, text="Feature status %d" %(data[hindex][2]))
+        self.Status = tk.Label(self, text="Feature status %d" %(0))
+        #self.Status.pack()
+        #self.Status.place(relx=.5, rely=0.35, anchor="n")
 
         h = 0
 
     def changeStatus(self):
         global data
-        hhindex = int(self.entry.get())
+        if self.entry.get() is not '':
+            hhindex = int(self.entry.get())
+        else:
+            hhindex = 0
         data[hhindex][2] = 1 if data[hhindex][2] == 0 else 0
         print("Feature status=",data[hhindex][2])
         self.Status.destroy()
         self.Status = tk.Label(self, text="Feature status %d" %(data[hhindex][2]))
-        self.Status.pack()
+        self.Status.place(relx=.5, rely=0.35, anchor="n")
+        
+        
+    def getStatus(self):
+        hhindex = int(self.entry.get())
+        print("Feature status=",data[hhindex][2])
+        self.Status.destroy()
+        self.Status = tk.Label(self, text="Feature status %d" %(data[hhindex][2]))
+        self.Status.place(relx=.5, rely=0.35, anchor="n")
         
         
     def jumpToFeature(self):
@@ -263,25 +308,23 @@ class PlotPage(tk.Frame):
         hhindex = int(self.entry.get())
         self.Status.destroy()
         self.Status = tk.Label(self, text="Feature status %d" %(data[hhindex][2]))
-        self.Status.pack()
         print("Feature status=",data[hhindex][2])
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hhindex])
+        h = histoFeature(fname,hhindex)            
         if self.widget:
             self.widget.destroy()
         canvas = FigureCanvasTkAgg(h, self)
         canvas.draw()
         self.widget = canvas.get_tk_widget()
+        self.Status.place(relx=.5, rely=0.35, anchor="n")
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
 
         
-    def updateFeature(self):
+    def nextFeature(self):
         global hindex
         #print(hindex)
         hindex = hindex + 1
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hindex])
+        h = histoFeature(fname,hindex)            
         if self.widget:
             self.widget.destroy()
         canvas = FigureCanvasTkAgg(h, self)
@@ -295,8 +338,7 @@ class PlotPage(tk.Frame):
         #print(hindex)
         if hindex == 0: return
         hindex = hindex - 1
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hindex])
+        h = histoFeature(fname,hindex)            
         if self.widget:
             self.widget.destroy()
         canvas = FigureCanvasTkAgg(h, self)
@@ -311,8 +353,7 @@ class PlotPage(tk.Frame):
         global hindex
         #print(hindex)
         hindex = 0
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hindex])
+        h = histoFeature(fname,hindex)            
         if self.widget:
             self.widget.destroy()
         canvas = FigureCanvasTkAgg(h, self)
@@ -327,8 +368,7 @@ class PlotPage(tk.Frame):
         global hindex
         #print(hindex)
         hindex = len(data) - 1
-        names = [n[0] for n in data]
-        h = histoFeature(data,names[hindex])
+        h = histoFeature(fname,hindex)            
         if self.widget:
             self.widget.destroy()
         canvas = FigureCanvasTkAgg(h, self)
