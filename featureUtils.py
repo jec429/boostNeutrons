@@ -58,7 +58,7 @@ def readClasses(fname):
     lines = np.array([ [float(x) for x in row] for row in csv.reader(f)])
     for i,r in enumerate(row0):
         categs = []
-        print(r)
+        #print(r)
         #if i > 5: break
         feat = Feature()
         feat.index = i
@@ -79,14 +79,14 @@ def readClasses(fname):
         feats.append(feat)
     return feats
         
-def histoFeature(dataF,categ,hname):
-    #dataF = readData(fname,hindex)
-    #categ = readData(fname,-1)
+def histoFeature(fname,hindex):
+    dataF = readData(fname,hindex)
+    categ = readData(fname,-1)
     #print(dataF)
     #print(categ)
-    x = [p for p,c in zip(normalizeFeature(dataF),categ) if c == 0 ]
-    y = [p for p,c in zip(normalizeFeature(dataF),categ) if c == 1 ]
-    z = [p for p,c in zip(normalizeFeature(dataF),categ) if c == 2 ]
+    x = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 0 ]
+    y = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 1 ]
+    z = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 2 ]
     
     fig, ax = plt.subplots()
 
@@ -99,7 +99,7 @@ def histoFeature(dataF,categ,hname):
     plt.hist(y, bins, alpha=0.5, label='Cat 1')
     plt.hist(z, bins, alpha=0.5, label='Cat 2')
     plt.legend(loc='upper right')
-    plt.xlabel(hname)
+    plt.xlabel(dataF[0])
     plt.ylabel('Counts')
 
     return fig

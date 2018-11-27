@@ -15,8 +15,6 @@ from featureUtils import *
 #data = readCSV('trainDump.csv')
 #data = readTXT('trainDump.csv')
 fname = 'trainDump.csv'
-data = readClasses('trainDump.csv')
-
 hindex = 0
 tindex = 0
 
@@ -154,10 +152,10 @@ class TablePage(tk.Frame):
 
     def LoadTable(self, tindex):
         ldata = []
-        #for l in range(tindex*20,(tindex+1)*20):
-        #    ldata.append(readData(fname,l))
-        for i,d in enumerate(data):
-            self.treeview.insert('', 'end', text=d.name, values=(tindex*20 + i, '%.3f' %d.mean, '%.3f' %d.STD, u'\u2705' if d.status == 1 else u'\u274C'))
+        for l in range(tindex*20,(tindex+1)*20):
+            ldata.append(readData(fname,l))
+        for i,d in enumerate(ldata):
+            self.treeview.insert('', 'end', text=d[0], values=(tindex*20 + i, '%.3f' %np.mean(d[1:]), '%.3f' %np.std(d[1:]), u'\u2705' if d[2] == 1 else u'\u274C'))
 
     def nextTable(self):
         global tindex
@@ -215,8 +213,7 @@ class PlotPage(tk.Frame):
             self.widget.destroy()
 
         #names = [n[0] for n in data]
-        #h = histoFeature(fname,hindex)
-        h = data[hindex].histo
+        h = histoFeature(fname,hindex)            
         canvas = FigureCanvasTkAgg(h, self)
         canvas.draw()
         self.widget = canvas.get_tk_widget()
