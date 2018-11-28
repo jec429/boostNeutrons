@@ -20,7 +20,6 @@ fstatus = initStatus(fnameHDF)
 hindex = 0
 tindex = 0
 
-
 LARGE_FONT= ("Verdana", 12)
 
 class FeaturesGUI(tk.Tk):
