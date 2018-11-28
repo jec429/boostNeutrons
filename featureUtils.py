@@ -4,6 +4,7 @@ from matplotlib.figure import Figure
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import time
 import csv
@@ -49,51 +50,67 @@ def readData(fname,dindex):
     #print(lines)
     return lines
 
-def readClasses(fname):
-    feats = []
-    i = 0
-    f = open(fname)
-    c = csv.reader(f)
-    row0 = next(c)
-    lines = np.array([ [float(x) for x in row] for row in csv.reader(f)])
-    for i,r in enumerate(row0):
-        categs = []
-        #print(r)
-        #if i > 5: break
-        feat = Feature()
-        feat.index = i
-        feat.name = r
-        lfeat = []
-        for j,row in enumerate(lines):
-            #if j%100 == 0: print('%d/%d' %(j,len(lines)))
-            categs.append((row[-1]))
-            lfeat.append(float(row[i]))
-        #print(lfeat)
-        #print(categs)
-        #lfeat = normalizeFeature(lfeat)
-        feat.mean = np.mean(np.array(lfeat))
-        feat.STD = np.std(np.array(lfeat))
-        if feat.mean == 0 and feat.STD == 0: continue
-        feat.histo = histoFeature(lfeat,categs,feat.name)
-        #print("Feature = %d %s %f" %(feat.index,feat.name,feat.mean))
-        feats.append(feat)
-    return feats
+def readDataHDF(fname,dindex):
+    if dindex > 1800 or dindex < 0:
+        fnameHDF = fname+'_1.hdf5'
+    else:
+        fnameHDF = fname+'_0.hdf5'
+    
+    hdf = pd.read_hdf(fnameHDF,'table')
+
+    result = [hdf.columns[dindex]]
+    
+    if 'class' in hdf.columns[dindex]:
+        pfeat = np.array(((hdf[hdf.columns[dindex]])))
+        where_are_NaNs = np.isnan(pfeat)
+        pfeat[where_are_NaNs] = 0
+        result += list(pfeat)
+    else:
+        pfeat = np.array(((hdf[hdf.columns[dindex]])))
+        where_are_NaNs = np.isnan(pfeat)
+        pfeat[where_are_NaNs] = 0
+        result += list(normalizeFeature(pfeat))
+
+    return result
         
-def histoFeature(fname,hindex):
-    dataF = readData(fname,hindex)
-    categ = readData(fname,-1)
+def readDataHDFBlock(fname,tindex):
+    if tindex > 1800 or tindex < 0:
+        fnameHDF = fname+'_1.hdf5'
+    else:
+        fnameHDF = fname+'_0.hdf5'
+    
+    hdf = pd.read_hdf(fnameHDF,'table')
+    
+    block = []
+    for i in range(tindex*20,(tindex+1)*20):
+        feat = [hdf.columns[i]]
+        pfeat = np.array(((hdf[hdf.columns[i]])))
+        where_are_NaNs = np.isnan(pfeat)
+        pfeat[where_are_NaNs] = 0
+        feat += list(normalizeFeature(pfeat))
+        block.append(feat)
+    return block
+            
+def histoFeature(fname,hindex,fstatus):
+    dataF = readDataHDF(fname,hindex)
+    categ = readDataHDF(fname,-1)
+    fstatus[hindex] = 0 if np.std(dataF[1:]) == 0 else 1
     #print(dataF)
     #print(categ)
-    x = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 0 ]
-    y = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 1 ]
-    z = [p for p,c in zip(normalizeFeature(dataF[1:]),categ) if c == 2 ]
+    x = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 0 ]
+    y = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 1 ]
+    z = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 2 ]
+
+    #print('x',x)
+    #print('y',y)
+    #print('z',z)
     
     fig, ax = plt.subplots()
 
-    #if 'class' in dataF[0]:
-    #    bins = np.linspace(0.0, 2.0, 100)
-    #else:
-    bins = np.linspace(-1.0, 1.0, 100)
+    if 'class' in dataF[0]:
+        bins = np.linspace(0.0, 2.0, 100)
+    else:
+        bins = np.linspace(-1.0, 1.0, 100)
 
     plt.hist(x, bins, alpha=0.5, label='Cat 0')
     plt.hist(y, bins, alpha=0.5, label='Cat 1')
@@ -137,6 +154,7 @@ def featureColumns(data):
 
 def normalizeFeature(feat):
     feature = np.array(feat)
+    #print(np.max(abs(feature)))
     if np.max(abs(feature)) > 0:
         return feature/np.max(abs(feature))
     else:
@@ -152,7 +170,28 @@ def featureStatus(ldata):
 def arrayRMS(ar):
     return np.sqrt(np.mean(np.square(ar)))
     
-#h = histoFeature(data,names[hindex])
+def initStatus(fname):
+    sz = 0
+    fnameHDF = fname + '_0.hdf5'
+    hdf = pd.read_hdf(fnameHDF,'table')
+    sz += len(hdf.columns)
+    fnameHDF = fname + '_1.hdf5'
+    hdf = pd.read_hdf(fnameHDF,'table')
+    sz += len(hdf.columns)
+    
+    return sz*[0]
+
+
+def csvToHDF(csv_filename):
+    hdf_filename_0 = csv_filename.replace('.csv','_0.hdf5')
+    hdf_filename_1 = csv_filename.replace('.csv','_1.hdf5')
+
+    df = pd.read_csv(csv_filename, header=0)
+    dfs = np.split(df, [1800], axis=1)
+    print(dfs[0]['n_hyps_0'])
+    
+    dfs[0].to_hdf(hdf_filename_0, 'table',append=False)
+    dfs[1].to_hdf(hdf_filename_1, 'table',append=False)
 
 class Feature():
     def __init__(self, *args, **kwargs):
