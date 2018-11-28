@@ -51,38 +51,47 @@ def readData(fname,dindex):
     return lines
 
 def readDataHDF(fname,dindex):
-    if dindex > 1800 or dindex < 0:
+    if dindex > 1499:
         fnameHDF = fname+'_1.hdf5'
+        ddindex = dindex - 1500
+    elif dindex < 0:
+        fnameHDF = fname+'_1.hdf5'
+        ddindex = dindex
     else:
         fnameHDF = fname+'_0.hdf5'
-    
+        ddindex = dindex
+        
     hdf = pd.read_hdf(fnameHDF,'table')
-
-    result = [hdf.columns[dindex]]
+    result = [hdf.columns[ddindex]]
     
-    if 'class' in hdf.columns[dindex]:
-        pfeat = np.array(((hdf[hdf.columns[dindex]])))
+    if 'class' in hdf.columns[ddindex]:
+        pfeat = np.array(((hdf[hdf.columns[ddindex]])))
         where_are_NaNs = np.isnan(pfeat)
         pfeat[where_are_NaNs] = 0
         result += list(pfeat)
     else:
-        pfeat = np.array(((hdf[hdf.columns[dindex]])))
+        pfeat = np.array(((hdf[hdf.columns[ddindex]])))
         where_are_NaNs = np.isnan(pfeat)
         pfeat[where_are_NaNs] = 0
         result += list(normalizeFeature(pfeat))
 
     return result
         
-def readDataHDFBlock(fname,tindex):
-    if tindex > 1800 or tindex < 0:
+def readDataHDFBlock(fname,tindex):    
+    if tindex > 74:
         fnameHDF = fname+'_1.hdf5'
+        ttindex = tindex - 75
+    elif tindex < 0:
+        fnameHDF = fname+'_1.hdf5'
+        ttindex = tindex
     else:
         fnameHDF = fname+'_0.hdf5'
-    
+        ttindex = tindex
+       
     hdf = pd.read_hdf(fnameHDF,'table')
-    
+
     block = []
-    for i in range(tindex*20,(tindex+1)*20):
+    for i in range(ttindex*20,(ttindex+1)*20):
         feat = [hdf.columns[i]]
         pfeat = np.array(((hdf[hdf.columns[i]])))
         where_are_NaNs = np.isnan(pfeat)
@@ -94,7 +103,7 @@ def readDataHDFBlock(fname,tindex):
 def histoFeature(fname,hindex,fstatus):
     dataF = readDataHDF(fname,hindex)
     categ = readDataHDF(fname,-1)
-    fstatus[hindex] = 0 if np.std(dataF[1:]) == 0 else 1
+    #fstatus[hindex] = 0 if np.std(dataF[1:]) == 0 else 1
     #print(dataF)
     #print(categ)
     x = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 0 ]
@@ -179,7 +188,7 @@ def initStatus(fname):
     hdf = pd.read_hdf(fnameHDF,'table')
     sz += len(hdf.columns)
     
-    return sz*[0]
+    return sz*[-1]
 
 
 def csvToHDF(csv_filename):
@@ -192,7 +201,7 @@ def csvToHDF(csv_filename):
     
     dfs[0].to_hdf(hdf_filename_0, 'table',append=False)
     dfs[1].to_hdf(hdf_filename_1, 'table',append=False)
-
+    
 class Feature():
     def __init__(self, *args, **kwargs):
         self.index = -1

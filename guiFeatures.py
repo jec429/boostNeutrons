@@ -15,8 +15,9 @@ from featureUtils import *
 #data = readCSV('trainDump.csv')
 #data = readTXT('trainDump.csv')
 fname = 'trainDump.csv'
-fnameHDF = 'testDump'
+fnameHDF = 'trainDump'
 fstatus = initStatus(fnameHDF)
+#print(fstatus)
 hindex = 0
 tindex = 0
 
@@ -156,7 +157,8 @@ class TablePage(tk.Frame):
         ldata = readDataHDFBlock(fnameHDF,tindex)
         #print(ldata[17])
         for i,d in enumerate(ldata):
-            fstatus[tindex*20 + i] = 0 if np.std(d[1:]) == 0 else 1
+            if fstatus[tindex*20 + i] == -1:
+                fstatus[tindex*20 + i] = 0 if np.std(d[1:]) == 0 else 1
             self.treeview.insert('', 'end', text=d[0], values=(tindex*20 + i, '%.3f' %np.mean(d[1:]), '%.3f' %np.std(d[1:]), u'\u2705' if fstatus[tindex*20 + i] == 1 else u'\u274C'))
 
     def nextTable(self):
@@ -179,29 +181,34 @@ class TablePage(tk.Frame):
 
         
     def printTable(self):
-        '''
-        print('Table printed')        
-        f = open('prunedDump.csv','w')
-        string = 'class,'
-        dt =  np.array(data[-1][1])[np.newaxis].T
-        for n in data[:-1]:
-            if n[2] == 1:
-                string += n[0]
-                string += ','
-                na = np.array(n[1])[np.newaxis]
-                dt = np.concatenate((dt,na.T),axis=1)
+        hdf_filename = 'tmp.hdf5'
+        df1 = pd.read_hdf('trainDump_1.hdf5','table')
+        df0 = pd.read_hdf('trainDump_0.hdf5','table')
 
-        string = string[:-1]+'\n'
-        for d in dt:
-            for e in d:
-                string += str(e)+','
-            string = string[:-1]+'\n'
-        f.write(string+'\n')
-        f.close()
-        '''
-        print("NOT IMPLEMENTED")
-        
+        df_c = pd.DataFrame(df1['class'])
+
+        for ttindex in range(len(df1.columns)-1):
+            ldata = readDataHDF(fnameHDF,len(df0.columns)+ttindex)
+            if fstatus[len(df0.columns)+ttindex] == -1:
+                fstatus[len(df0.columns)+ttindex] = 0 if np.std(ldata[1:]) == 0 else 1
+            if fstatus[len(df0.columns)+ttindex] == 1:
+                df_d = pd.DataFrame(df1[df1.columns[ttindex]])
+                df_c = df_c.join(df_d)
             
+        for ttindex in range(len(df0.columns)):
+            ldata = readDataHDF(fnameHDF,ttindex)
+            if fstatus[ttindex] == -1:
+                fstatus[ttindex] = 0 if np.std(ldata[1:]) == 0 else 1
+            if fstatus[ttindex] == 1:
+                df_d = pd.DataFrame(df0[df0.columns[ttindex]])
+                df_c = df_c.join(df_d)
+                             
+        df_c.to_hdf(hdf_filename,'table')
+        #df_c.to_csv('tstCSV.csv')
+        df2 = pd.read_hdf('tmp.hdf5','table')
+        df2.info()
+        print(df2['class'])
+        
 class PlotPage(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -269,20 +276,15 @@ class PlotPage(tk.Frame):
         h = 0
 
     def changeStatus(self):
-        if self.entry.get() is not '':
-            hhindex = int(self.entry.get())
-        else:
-            hhindex = 0
-        fstatus[hhindex] = 1 if fstatus[hhindex] == 0 else 0
-        print("Feature status=",fstatus[hhindex])
+        global fstatus        
+        fstatus[hindex] = 1 if fstatus[hindex] == 0 else 0
+        print("Feature status=",fstatus[hindex])
         self.Status.destroy()
-        self.Status = tk.Label(self, text="Feature status %d" %(fstatus[hhindex]))
+        self.Status = tk.Label(self, text="Feature status %d" %(fstatus[hindex]))
         self.Status.place(relx=.5, rely=0.35, anchor="n")
         
         
-    def getStatus(self):
-        
-        #hhindex = int(self.entry.get())
+    def getStatus(self):        
         print("Feature status=",fstatus[hindex])
         self.Status.destroy()
         self.Status = tk.Label(self, text="Feature status %d" %(fstatus[hindex]))
@@ -291,10 +293,8 @@ class PlotPage(tk.Frame):
         
     def jumpToFeature(self):
         global hindex
-        global fstatus
-        global tindex
-        #print(self.entry.get())
         hindex = int(self.entry.get())
+        global tindex
         tindex = int(hindex/20)
         self.Status.destroy()
         self.Status = tk.Label(self, text="Feature status %d" %(fstatus[hindex]))
@@ -312,9 +312,10 @@ class PlotPage(tk.Frame):
         
     def nextFeature(self):
         global hindex
-        global fstatus
         #print(hindex)
         hindex = hindex + 1
+        global tindex
+        tindex = int(hindex/20)
         h = histoFeature(fnameHDF,hindex,fstatus)            
         if self.widget:
             self.widget.destroy()
@@ -327,10 +328,11 @@ class PlotPage(tk.Frame):
 
     def previousFeature(self):
         global hindex
-        global fstatus
         #print(hindex)
         if hindex == 0: return
         hindex = hindex - 1
+        global tindex
+        tindex = int(hindex/20)
         h = histoFeature(fnameHDF,hindex,fstatus)            
         if self.widget:
             self.widget.destroy()
@@ -344,8 +346,9 @@ class PlotPage(tk.Frame):
 
     def firstFeature(self):
         global hindex
-        global fstatus
         hindex = 0
+        global tindex
+        tindex = int(hindex/20)
         h = histoFeature(fnameHDF,hindex,fstatus)            
         if self.widget:
             self.widget.destroy()
@@ -359,9 +362,10 @@ class PlotPage(tk.Frame):
 
     def lastFeature(self):
         global hindex
-        global fstatus
         #print(hindex)
         hindex = -1
+        global tindex
+        tindex = int(hindex/20)
         h = histoFeature(fnameHDF,hindex,fstatus)            
         if self.widget:
             self.widget.destroy()
