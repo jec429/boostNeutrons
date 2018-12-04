@@ -51,47 +51,30 @@ def readData(fname,dindex):
     return lines
 
 def readDataHDF(fname,dindex):
-    if dindex > 1499:
-        fnameHDF = fname+'_1.hdf5'
-        ddindex = dindex - 1500
-    elif dindex < 0:
-        fnameHDF = fname+'_1.hdf5'
-        ddindex = dindex
-    else:
-        fnameHDF = fname+'_0.hdf5'
-        ddindex = dindex
-        
-    hdf = pd.read_hdf(fnameHDF,'table')
-    result = [hdf.columns[ddindex]]
+       
+    hdf = pd.read_hdf(fname+'.h5')
+    #print(hdf[0])
+    result = [hdf.keys()[dindex]]
+
     
-    if 'class' in hdf.columns[ddindex]:
-        pfeat = np.array(((hdf[hdf.columns[ddindex]])))
+    if 'class' in hdf.columns[dindex]:
+        pfeat = np.array(((hdf[hdf.columns[dindex]])))
         where_are_NaNs = np.isnan(pfeat)
         pfeat[where_are_NaNs] = 0
         result += list(pfeat)
     else:
-        pfeat = np.array(((hdf[hdf.columns[ddindex]])))
+        pfeat = np.array(((hdf[hdf.columns[dindex]])))
         where_are_NaNs = np.isnan(pfeat)
         pfeat[where_are_NaNs] = 0
         result += list(normalizeFeature(pfeat))
 
     return result
         
-def readDataHDFBlock(fname,tindex):    
-    if tindex > 74:
-        fnameHDF = fname+'_1.hdf5'
-        ttindex = tindex - 75
-    elif tindex < 0:
-        fnameHDF = fname+'_1.hdf5'
-        ttindex = tindex
-    else:
-        fnameHDF = fname+'_0.hdf5'
-        ttindex = tindex
-       
-    hdf = pd.read_hdf(fnameHDF,'table')
+def readDataHDFBlock(fname,tindex):           
+    hdf = pd.read_hdf(fname+'.h5')
 
     block = []
-    for i in range(ttindex*20,(ttindex+1)*20):
+    for i in range(tindex*20,(tindex+1)*20):
         feat = [hdf.columns[i]]
         pfeat = np.array(((hdf[hdf.columns[i]])))
         where_are_NaNs = np.isnan(pfeat)
@@ -181,11 +164,7 @@ def arrayRMS(ar):
     
 def initStatus(fname):
     sz = 0
-    fnameHDF = fname + '_0.hdf5'
-    hdf = pd.read_hdf(fnameHDF,'table')
-    sz += len(hdf.columns)
-    fnameHDF = fname + '_1.hdf5'
-    hdf = pd.read_hdf(fnameHDF,'table')
+    hdf = pd.read_hdf(fname+'.h5')
     sz += len(hdf.columns)
     
     return sz*[-1]

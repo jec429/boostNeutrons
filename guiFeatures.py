@@ -2,7 +2,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
-
+import os
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
@@ -15,8 +15,10 @@ from featureUtils import *
 #data = readCSV('trainDump.csv')
 #data = readTXT('trainDump.csv')
 fname = 'trainDump.csv'
-fnameHDF = 'trainDump'
+fnameHDF = 'test_5k'
+fnameHDF_full = 'test'
 fstatus = initStatus(fnameHDF)
+fstatus[-1] = 1
 #print(fstatus)
 hindex = 0
 tindex = 0
@@ -181,33 +183,43 @@ class TablePage(tk.Frame):
 
         
     def printTable(self):
-        hdf_filename = 'tmp.hdf5'
-        df1 = pd.read_hdf('trainDump_1.hdf5','table')
-        df0 = pd.read_hdf('trainDump_0.hdf5','table')
+        global fstatus
+        
+        hdf = pd.read_hdf(fnameHDF+'.h5')
+        print ('Getting status')
+        for i,s in enumerate(fstatus):            
+        #for i,s in enumerate(fstatus[:10]):
+            if i%100 == 0: print ('%d/%d' %(i,len(fstatus)))
+            if s == -1:
+                data = readDataHDF(fnameHDF,i)
+                fstatus[i] = 0 if np.std(data[1:]) == 0 else 1
+        print ('Done getting status')
 
-        df_c = pd.DataFrame(df1['class'])
+        print ('Printing table')
+        labels = []
+        bdata = []
+        hdf_filename = 'tmp.h5'
+        os.system('rm '+hdf_filename)
+        store = pd.HDFStore(hdf_filename)
+        hdf = pd.read_hdf(fnameHDF_full+'.h5')
 
-        for ttindex in range(len(df1.columns)-1):
-            ldata = readDataHDF(fnameHDF,len(df0.columns)+ttindex)
-            if fstatus[len(df0.columns)+ttindex] == -1:
-                fstatus[len(df0.columns)+ttindex] = 0 if np.std(ldata[1:]) == 0 else 1
-            if fstatus[len(df0.columns)+ttindex] == 1:
-                df_d = pd.DataFrame(df1[df1.columns[ttindex]])
-                df_c = df_c.join(df_d)
-            
-        for ttindex in range(len(df0.columns)):
-            ldata = readDataHDF(fnameHDF,ttindex)
-            if fstatus[ttindex] == -1:
-                fstatus[ttindex] = 0 if np.std(ldata[1:]) == 0 else 1
-            if fstatus[ttindex] == 1:
-                df_d = pd.DataFrame(df0[df0.columns[ttindex]])
-                df_c = df_c.join(df_d)
-                             
-        df_c.to_hdf(hdf_filename,'table')
-        #df_c.to_csv('tstCSV.csv')
-        df2 = pd.read_hdf('tmp.hdf5','table')
+        labels = [x for i,x in enumerate(list(hdf.keys())) if fstatus[i] == 1 ]
+        print('features=',labels)
+        for l in labels:
+            bdata.append(hdf[l])
+        
+        df = pd.DataFrame(np.array(bdata).T , columns=labels)
+        #print(df)
+        store.append('df', df)
+        store.close()
+        #print(labels)
+
+        
+        #df = (((hdf[hdf.columns[0]])))                                     
+        #df.to_hdf(hdf_filename,'table')
+        df2 = pd.read_hdf('tmp.h5')
         df2.info()
-        print(df2['class'])
+        #print(df2['class'])
         
 class PlotPage(tk.Frame):
 
