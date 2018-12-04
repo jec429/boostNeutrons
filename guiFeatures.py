@@ -43,7 +43,7 @@ class FeaturesGUI(tk.Tk):
         
         self.frames = {}
 
-        for F in (StartPage, PageOne, TablePage, PlotPage):
+        for F in (StartPage, PageOne, TablePage, PlotPage, BoostPage):
             frame = F(self.container, self)
             self.frames[F] = frame
             frame.grid(row=0, column=0, sticky="nsew")
@@ -72,15 +72,18 @@ class StartPage(tk.Frame):
         button2.configure(height = 2, width = 20)
         button2.place(relx=.35, rely=0.4, anchor="c")
         
-        button3 = tk.Button(self, text="Plots Page",
-                            command=lambda: controller.show_frame(PlotPage))
+        button3 = tk.Button(self, text="Plots Page", command=lambda: controller.show_frame(PlotPage))
         button3.configure(height = 2, width = 20)
         button3.place(relx=.65, rely=0.4, anchor="c")
 
-        button4 = tk.Button(self, text="Quit",
-                            command=self.quit)
+        button4 = tk.Button(self, text="Boost Page", command=lambda: controller.show_frame(BoostPage))
         button4.configure(height = 2, width = 40)
         button4.place(relx=.5, rely=.5, anchor="c")
+        
+        button5 = tk.Button(self, text="Quit",
+                            command=self.quit)
+        button5.configure(height = 2, width = 40)
+        button5.place(relx=.5, rely=.6, anchor="c")
         
 class PageOne(tk.Frame):
 
@@ -98,6 +101,71 @@ class PageOne(tk.Frame):
         button2.pack()
 
 
+class BoostPage(tk.Frame):
+
+    def __init__(self, parent, controller):
+        tk.Frame.__init__(self, parent)
+        self.boost = None
+        #self.num_round = 5
+        label = tk.Label(self, text="Page One!!!", font=LARGE_FONT)
+        label.pack(pady=10,padx=10)
+
+        button1 = ttk.Button(self, text="Back to Home",
+                            command=lambda: controller.show_frame(StartPage))
+        button1.pack()
+
+        button2 = ttk.Button(self, text="Boost",
+                             command=self.boosted)
+        button2.pack()
+
+        button3 = ttk.Button(self, text="Get confusion",
+                             command=lambda: get_confusion_matrix(self.boost))
+        button3.pack()
+
+        button4 = ttk.Button(self, text="Plot feature importance",
+                             command=self.plot_feature_importance)
+        button4.pack()
+
+        labelF = tk.Label(self, text="Number of rounds", font=LARGE_FONT)
+        labelF.pack()
+        self.entry = tk.Entry(self,width=10)
+        self.entry.insert(5,'5')
+        self.entry.pack()
+        button6 = tk.Button(self, text="Boost more", command=self.boosted)
+        button6.pack()
+
+        
+        buttonQ = ttk.Button(self, text="Quit",
+                            command=self.quit)
+        buttonQ.pack()
+
+        self.widget = None
+        if self.widget:
+            self.widget.destroy()
+        h = plt.figure()
+        canvas = FigureCanvasTkAgg(h, self)
+        canvas.draw()
+        self.widget = canvas.get_tk_widget()
+
+        self.widget.pack(fill=tk.BOTH)
+        
+    def boosted(self):
+        self.num_round = self.entry.get()
+        self.boost = boosted(int(self.entry.get()))
+    def plot_feature_importance(self):
+        if self.boost == None:
+            print('Boost first!')
+            return 0    
+        h = plot_importance(self.boost)
+        if self.widget:
+            self.widget.destroy()
+        canvas = FigureCanvasTkAgg(h, self)
+        canvas.draw()
+        self.widget = canvas.get_tk_widget()
+        self.widget.pack(fill=tk.BOTH)
+        plt.close('all')
+
+        
 class TablePage(tk.Frame):
 
     def __init__(self, parent, controller):
@@ -118,7 +186,7 @@ class TablePage(tk.Frame):
         button3.pack()
 
         buttonN = ttk.Button(self, text="Next",
-                             command=lambda: self.nextTable())
+                             command=self.nextTable)
         buttonN.pack()
 
         buttonP = ttk.Button(self, text="Previous",
@@ -197,7 +265,8 @@ class TablePage(tk.Frame):
 
         print ('Printing table')
         labels = []
-        bdata = []
+        bdata0 = []
+        bdata1 = []
         hdf_filename = 'tmp.h5'
         os.system('rm '+hdf_filename)
         store = pd.HDFStore(hdf_filename)
@@ -206,18 +275,24 @@ class TablePage(tk.Frame):
         labels = [x for i,x in enumerate(list(hdf.keys())) if fstatus[i] == 1 ]
         print('features=',labels)
         for l in labels:
-            bdata.append(hdf[l])
+            A = hdf[l]
+            bdata0.append(A[:len(A)//2])
+            bdata1.append(A[len(A)//2:])
         
-        df = pd.DataFrame(np.array(bdata).T , columns=labels)
+        df0 = pd.DataFrame(np.array(bdata0).T , columns=labels)
+        df1 = pd.DataFrame(np.array(bdata1).T , columns=labels)
         #print(df)
-        store.append('df', df)
+        store.append('train', df0)
+        store.append('test', df1)
         store.close()
         #print(labels)
 
         
         #df = (((hdf[hdf.columns[0]])))                                     
         #df.to_hdf(hdf_filename,'table')
-        df2 = pd.read_hdf('tmp.h5')
+        df2 = pd.read_hdf('tmp.h5','train')
+        df2.info()
+        df2 = pd.read_hdf('tmp.h5','test')
         df2.info()
         #print(df2['class'])
         

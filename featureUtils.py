@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 import csv
+import xgboost as xgb
 
 def readCSV(fname):
     start_time = time.time()
@@ -189,3 +190,67 @@ class Feature():
         self.mean = 0.0
         self.histo = None
         self.status = 0 
+
+
+def boosted(num_round):
+    hdf = pd.read_hdf('tmp.h5','train')
+    cat = pd.DataFrame(hdf['class'])   
+    del hdf['class']
+    dtrain = xgb.DMatrix(hdf,cat)
+    hdf = pd.read_hdf('tmp.h5','test')
+    cat = pd.DataFrame(hdf['class'])
+    del hdf['class']
+    dtest = xgb.DMatrix(hdf,cat)
+    
+    print("Labels")
+    print(dtrain.get_label())
+    print(dtest.get_label())
+    # specify parameters via map, definition are same as c++ version
+    param = {'max_depth':6, 'eta':0.3, 'silent':1, 'objective':'multi:softmax', 'num_class':3, 'eval_metric':['merror','mlogloss']}
+    #param = {'max_depth':10, 'eta':0.1, 'silent':1, 'objective':'reg:linear'}
+    
+    # specify validations set to watch performance
+    watchlist = [(dtest, 'eval'), (dtrain, 'train')]
+    #num_round = 5
+    bst = xgb.train(param, dtrain, num_round, watchlist)
+    preds = bst.predict(dtest)
+    labels = dtest.get_label()
+        
+    #xgb.plot_tree(bst, num_trees=2)
+    #xgb.plot_tree(bst, num_trees=0)
+    #xgb.to_graphviz(bst, num_trees=2)
+    
+    print('error=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) != int(labels[i])) / float(len(preds))))
+    print('accuracy=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == int(labels[i])) / float(len(preds))))
+
+    return bst
+
+def plot_importance(bst):
+    if bst == None:
+        print('Boost first!')
+        return 0
+    fig = xgb.plot_importance(bst, max_num_features=10).figure
+    return fig
+
+def get_confusion_matrix(bst):
+    if bst == None:
+        print('Boost first!')
+        return 0
+    hdf = pd.read_hdf('tmp.h5','test')
+    cat = pd.DataFrame(hdf['class'])
+    del hdf['class']
+    dtest = xgb.DMatrix(hdf,cat)
+    # this is prediction
+    preds = bst.predict(dtest)
+    labels = dtest.get_label()
+    
+    print('0,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 0)))
+    print('0,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 1)))
+    print('0,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 2)))
+    print('1,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 0)))
+    print('1,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 1)))
+    print('1,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 2)))
+    print('2,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 0)))
+    print('2,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 1)))
+    print('2,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 2)))
+
