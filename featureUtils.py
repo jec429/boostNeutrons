@@ -1,6 +1,6 @@
+from __future__ import print_function
 import matplotlib
 from matplotlib.figure import Figure
-
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
@@ -9,6 +9,14 @@ import matplotlib.pyplot as plt
 import time
 import csv
 import xgboost as xgb
+import json
+import matplotlib.pyplot as plt
+import re
+from six.moves import range
+from matplotlib import rc
+from conf_mat_pl import make_conf_mat_plots_rowcolnormonly
+from conf_mat_pl import make_conf_mat_plots_raw
+from scipy import stats
 
 def readCSV(fname):
     start_time = time.time()
@@ -51,12 +59,10 @@ def readData(fname,dindex):
     #print(lines)
     return lines
 
-def readDataHDF(fname,dindex):
-       
+def readDataHDF(fname,dindex):       
     hdf = pd.read_hdf(fname+'.h5')
     #print(hdf[0])
     result = [hdf.keys()[dindex]]
-
     
     if 'class' in hdf.columns[dindex]:
         pfeat = np.array(((hdf[hdf.columns[dindex]])))
@@ -87,21 +93,19 @@ def readDataHDFBlock(fname,tindex):
 def histoFeature(fname,hindex,fstatus):
     dataF = readDataHDF(fname,hindex)
     categ = readDataHDF(fname,-1)
-    #fstatus[hindex] = 0 if np.std(dataF[1:]) == 0 else 1
-    #print(dataF)
-    #print(categ)
     x = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 0 ]
     y = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 1 ]
     z = [p for p,c in zip((dataF[1:]),categ[1:]) if c == 2 ]
 
-    #print('x',x)
-    #print('y',y)
-    #print('z',z)
-    
     fig, ax = plt.subplots()
-
+    fig = plt.figure(figsize=(13, 5))
+    
     if 'class' in dataF[0]:
         bins = np.linspace(0.0, 2.0, 100)
+    elif np.min(dataF[1:]) > 0.5:
+        bins = np.linspace(0.5, 1.0, 100)
+    elif np.min(dataF[1:]) > 0:
+        bins = np.linspace(0.0, 1.0, 100)
     else:
         bins = np.linspace(-1.0, 1.0, 100)
 
@@ -113,7 +117,6 @@ def histoFeature(fname,hindex,fstatus):
     plt.ylabel('Counts')
 
     return fig
-
 
 def removeFeature(data,hname):
     index = findFeature([n[0] for n in data ],hname)
@@ -146,13 +149,17 @@ def featureColumns(data):
     return featureStatus(new_data)
 
 def normalizeFeature(feat):
-    feature = np.array(feat)
-    #print(np.max(abs(feature)))
-    if np.max(abs(feature)) > 0:
-        return feature/np.max(abs(feature))
+    if np.max(abs(feat)) > 0:
+        feature = feat/np.max(abs(feat))
     else:
-        return feature
-
+        feature = feat
+    
+    minf = np.min(feature)
+    num = (1.-minf) if (1.-minf) != 0 else 1
+    featX = np.array([2./num*x+1.-2./num for x in feature])
+    #print(np.max(abs(feature)))
+    return featX
+    
 def featureStatus(ldata):
     new_data = []
     for d in ldata:
@@ -163,14 +170,31 @@ def featureStatus(ldata):
 def arrayRMS(ar):
     return np.sqrt(np.mean(np.square(ar)))
     
-def initStatus(fname):
-    sz = 0
+def init_status(fname):
+    with open('my_dict.json') as f:
+        my_dict = json.load(f)
+    status = []
     hdf = pd.read_hdf(fname+'.h5')
-    sz += len(hdf.columns)
+    for c in hdf.columns:
+        #print(c,my_dict[c])
+        status.append(my_dict[c])
+
+    #print('status=',len(my_dict),sz)
+        
+    return status
+
+def update_status(fname,status):
+    hdf = pd.read_hdf(fname+'.h5')
+    with open('my_dict.json') as f:
+        my_dict = json.load(f)
+
+    for i,c in enumerate(hdf.columns):
+        #print(c,status[i])
+        my_dict[c] = status[i]
+
+    with open('my_dict.json', 'w') as f:
+        json.dump(my_dict, f)
     
-    return sz*[-1]
-
-
 def csvToHDF(csv_filename):
     hdf_filename_0 = csv_filename.replace('.csv','_0.hdf5')
     hdf_filename_1 = csv_filename.replace('.csv','_1.hdf5')
@@ -191,20 +215,39 @@ class Feature():
         self.histo = None
         self.status = 0 
 
-
 def boosted(num_round):
+    ## TRAINING DATASET
     hdf = pd.read_hdf('tmp.h5','train')
-    cat = pd.DataFrame(hdf['class'])   
+    cat = pd.DataFrame(hdf['class'])
     del hdf['class']
-    dtrain = xgb.DMatrix(hdf,cat)
+
+    hdf['weight'] = 0
+    for c in hdf.columns:
+        hdf['weight'] = hdf['weight'] + ((hdf[c] - hdf[c].mean())/hdf[c].std(ddof=0) < 3)
+    wei = pd.DataFrame(hdf['weight'])
+    weig = [x[0] for x in wei.values]
+    #print((weig))
+    del hdf['weight']
+    dtrain = xgb.DMatrix(hdf,cat)#, weight=weig)
+
+    ## TESTING DATASET
     hdf = pd.read_hdf('tmp.h5','test')
     cat = pd.DataFrame(hdf['class'])
     del hdf['class']
-    dtest = xgb.DMatrix(hdf,cat)
+    
+    hdf['weight'] = 0
+    for c in hdf.columns:
+        hdf['weight'] = hdf['weight'] + ((hdf[c] - hdf[c].mean())/hdf[c].std(ddof=0) < 3)
+    wei = pd.DataFrame(hdf['weight'])
+    weig = [x[0] for x in wei.values]
+    #print((weig))
+    del hdf['weight']
+
+    dtest = xgb.DMatrix(hdf,cat)#, weight=weig)
     
     print("Labels")
-    print(dtrain.get_label())
-    print(dtest.get_label())
+    print(len(dtrain.get_label()))
+    print(len(dtest.get_label()))
     # specify parameters via map, definition are same as c++ version
     param = {'max_depth':6, 'eta':0.3, 'silent':1, 'objective':'multi:softmax', 'num_class':3, 'eval_metric':['merror','mlogloss']}
     #param = {'max_depth':10, 'eta':0.1, 'silent':1, 'objective':'reg:linear'}
@@ -229,7 +272,16 @@ def plot_importance(bst):
     if bst == None:
         print('Boost first!')
         return 0
-    fig = xgb.plot_importance(bst, max_num_features=10).figure
+    ax = xgb.plot_importance(bst, max_num_features=10)
+    fig = ax.figure
+
+    f_imp = open('important_features.txt','w')
+    labels = list(ax.get_yticklabels())
+    labels.reverse()
+    for l in labels:
+        f_imp.write(l.get_text()+'\n')
+
+    f_imp.close()
     return fig
 
 def get_confusion_matrix(bst):
@@ -244,13 +296,24 @@ def get_confusion_matrix(bst):
     preds = bst.predict(dtest)
     labels = dtest.get_label()
     
-    print('0,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 0)))
-    print('0,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 1)))
-    print('0,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 2)))
-    print('1,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 0)))
-    print('1,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 1)))
-    print('1,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 2)))
-    print('2,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 0)))
-    print('2,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 1)))
-    print('2,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 2)))
+    l = []
+    for i in range(3):
+        lj = []
+        for j in range(3):
+            print(i,j,sum(1 for k in range(len(preds)) if int(preds[k]) == i and  int(labels[k]) == j))
+            lj.append(sum(1 for k in range(len(preds)) if int(preds[k]) == i and  int(labels[k]) == j))
+        l.append(lj)
+    print(l)
+    return np.array(l)
 
+def plot_confusion_matrix(matrix):
+    #rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+    #rc('text', usetex=True)
+    #plt.rc('text', usetex=True)
+    #plt.rc('font', family='serif')
+    #arr2 = np.array([[914,220,51],[65,390,199],[21,390,750]])
+    plot_type_base = 'confusion_matrix_vtxfndr_trainE_testE_'
+    plot_type = plot_type_base + str(matrix.shape[0])
+    fig = make_conf_mat_plots_raw(matrix, plot_type)
+    return fig
+    

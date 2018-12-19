@@ -17,7 +17,7 @@ from featureUtils import *
 fname = 'trainDump.csv'
 fnameHDF = 'test_5k'
 fnameHDF_full = 'test'
-fstatus = initStatus(fnameHDF)
+fstatus = init_status(fnameHDF)
 fstatus[-1] = 1
 #print(fstatus)
 hindex = 0
@@ -100,13 +100,11 @@ class PageOne(tk.Frame):
                             command=lambda: controller.show_frame(TablePage))
         button2.pack()
 
-
 class BoostPage(tk.Frame):
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
         self.boost = None
-        #self.num_round = 5
         label = tk.Label(self, text="Page One!!!", font=LARGE_FONT)
         label.pack(pady=10,padx=10)
 
@@ -118,13 +116,17 @@ class BoostPage(tk.Frame):
                              command=self.boosted)
         button2.pack()
 
-        button3 = ttk.Button(self, text="Get confusion",
-                             command=lambda: get_confusion_matrix(self.boost))
-        button3.pack()
+        #button3 = ttk.Button(self, text="Get confusion",
+        #                     command=lambda: get_confusion_matrix(self.boost))
+        #button3.pack()
 
         button4 = ttk.Button(self, text="Plot feature importance",
                              command=self.plot_feature_importance)
         button4.pack()
+
+        button5 = ttk.Button(self, text="Plot confusion matrix",
+                             command=self.plot_confusion_matrix)
+        button5.pack()
 
         labelF = tk.Label(self, text="Number of rounds", font=LARGE_FONT)
         labelF.pack()
@@ -134,9 +136,10 @@ class BoostPage(tk.Frame):
         button6 = tk.Button(self, text="Boost more", command=self.boosted)
         button6.pack()
 
+        button7 = tk.Button(self, text="Update status", command=lambda: update_status(fnameHDF, fstatus))
+        button7.pack()
         
-        buttonQ = ttk.Button(self, text="Quit",
-                            command=self.quit)
+        buttonQ = ttk.Button(self, text="Quit", command=self.quit)
         buttonQ.pack()
 
         self.widget = None
@@ -150,8 +153,9 @@ class BoostPage(tk.Frame):
         self.widget.pack(fill=tk.BOTH)
         
     def boosted(self):
-        self.num_round = self.entry.get()
-        self.boost = boosted(int(self.entry.get()))
+        self.boost = None
+        self.boost = boosted(int(self.entry.get()))        
+        
     def plot_feature_importance(self):
         if self.boost == None:
             print('Boost first!')
@@ -164,7 +168,19 @@ class BoostPage(tk.Frame):
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
-
+        
+    def plot_confusion_matrix(self):
+        if self.boost == None:
+            print('Boost first!')
+            #return 0    
+        h = plot_confusion_matrix(get_confusion_matrix(self.boost))
+        if self.widget:
+            self.widget.destroy()
+        canvas = FigureCanvasTkAgg(h, self)
+        canvas.draw()
+        self.widget = canvas.get_tk_widget()
+        self.widget.pack(fill=tk.BOTH)
+        plt.close('all')
         
 class TablePage(tk.Frame):
 
@@ -196,6 +212,10 @@ class TablePage(tk.Frame):
         buttonPrint = ttk.Button(self, text="Print Table",
                              command=self.printTable)
         buttonPrint.pack()
+
+        buttonU = tk.Button(self, text="Update status", command=lambda: update_status(fnameHDF, fstatus))
+        buttonU.pack()
+        
         
         buttonQ = ttk.Button(self, text="Quit",
                             command=self.quit)
@@ -227,9 +247,14 @@ class TablePage(tk.Frame):
         ldata = readDataHDFBlock(fnameHDF,tindex)
         #print(ldata[17])
         for i,d in enumerate(ldata):
-            if fstatus[tindex*20 + i] == -1:
+            if fstatus[tindex*20 + i] == -1 or fstatus[tindex*20 + i] == 1:
                 fstatus[tindex*20 + i] = 0 if np.std(d[1:]) == 0 else 1
-            self.treeview.insert('', 'end', text=d[0], values=(tindex*20 + i, '%.3f' %np.mean(d[1:]), '%.3f' %np.std(d[1:]), u'\u2705' if fstatus[tindex*20 + i] == 1 else u'\u274C'))
+            self.treeview.insert('', 'end', text=d[0], values=(
+                tindex*20 + i,
+                '%.3f' %np.mean(d[1:]),
+                '%.3f' %np.std(d[1:]),
+                u'\u2705' if fstatus[tindex*20 + i] == 1 else u'\u274C')
+            )
 
     def nextTable(self):
         global tindex
@@ -248,15 +273,12 @@ class TablePage(tk.Frame):
 
     def DeleteUI(self):
         self.treeview.delete()
-
         
     def printTable(self):
-        global fstatus
-        
+        global fstatus        
         hdf = pd.read_hdf(fnameHDF+'.h5')
         print ('Getting status')
         for i,s in enumerate(fstatus):            
-        #for i,s in enumerate(fstatus[:10]):
             if i%100 == 0: print ('%d/%d' %(i,len(fstatus)))
             if s == -1:
                 data = readDataHDF(fnameHDF,i)
@@ -275,7 +297,19 @@ class TablePage(tk.Frame):
         labels = [x for i,x in enumerate(list(hdf.keys())) if fstatus[i] == 1 ]
         print('features=',labels)
         for l in labels:
-            A = hdf[l]
+            feat = hdf[l]
+            if 'class' in l:
+                A = np.array(feat)
+            else:
+                if np.max(abs(feat)) > 0:
+                    feature = feat/np.max(abs(feat))
+                else:
+                    feature = feat
+                    
+                minf = np.min(feature)
+                num = (1.-minf) if (1.-minf) != 0 else 1
+                A = np.array([2./num*x+1.-2./num for x in feature])
+
             bdata0.append(A[:len(A)//2])
             bdata1.append(A[len(A)//2:])
         
@@ -380,7 +414,7 @@ class PlotPage(tk.Frame):
         
     def jumpToFeature(self):
         global hindex
-        hindex = int(self.entry.get())
+        hindex = int(self.entry.get()) if '_' not in self.entry.get() else list(pd.read_hdf(fnameHDF+'.h5').keys()).index(self.entry.get())
         global tindex
         tindex = int(hindex/20)
         self.Status.destroy()
