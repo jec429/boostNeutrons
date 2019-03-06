@@ -15,8 +15,8 @@ from featureUtils import *
 #data = readCSV('trainDump.csv')
 #data = readTXT('trainDump.csv')
 fname = 'trainDump.csv'
-fnameHDF = 'test_5k'
-fnameHDF_full = 'test'
+fnameHDF = 'test_QE_5k'
+fnameHDF_full = 'test_QE'
 fstatus = init_status(fnameHDF)
 fstatus[-1] = 1
 #print(fstatus)
@@ -80,10 +80,21 @@ class StartPage(tk.Frame):
         button4.configure(height = 2, width = 40)
         button4.place(relx=.5, rely=.5, anchor="c")
         
-        button5 = tk.Button(self, text="Quit",
-                            command=self.quit)
+        button5 = tk.Button(self, text="Reset status", command=self.reset_status )
         button5.configure(height = 2, width = 40)
         button5.place(relx=.5, rely=.6, anchor="c")
+
+        button6 = tk.Button(self, text="Quit",
+                            command=self.quit)
+        button6.configure(height = 2, width = 40)
+        button6.place(relx=.5, rely=.7, anchor="c")
+
+    def reset_status(self):
+        global fstatus
+        fstatus = len(fstatus)*[1]
+        print(fstatus)
+
+        
         
 class PageOne(tk.Frame):
 
@@ -139,6 +150,9 @@ class BoostPage(tk.Frame):
         button7 = tk.Button(self, text="Update status", command=lambda: update_status(fnameHDF, fstatus))
         button7.pack()
         
+        button8 = tk.Button(self, text="Prune features", command=self.prune_features)
+        button8.pack()
+        
         buttonQ = ttk.Button(self, text="Quit", command=self.quit)
         buttonQ.pack()
 
@@ -172,7 +186,7 @@ class BoostPage(tk.Frame):
     def plot_confusion_matrix(self):
         if self.boost == None:
             print('Boost first!')
-            #return 0    
+            return 0    
         h = plot_confusion_matrix(get_confusion_matrix(self.boost))
         if self.widget:
             self.widget.destroy()
@@ -181,6 +195,39 @@ class BoostPage(tk.Frame):
         self.widget = canvas.get_tk_widget()
         self.widget.pack(fill=tk.BOTH)
         plt.close('all')
+
+    def prune_features(self):
+        if self.boost == None:
+            print('Boost first!')
+            return 0    
+        tuples = get_importance(self.boost)
+        with open('my_dict.json') as f:
+            my_dict = json.load(f)
+        best = tuples[-1]
+        print("Total features=",len(tuples))
+        print("best feature=",best[0],best[1])
+        hdf = pd.read_hdf('tmp.h5','train')
+        hdf2 = pd.read_hdf('tmp.h5','test')
+
+        tuples.reverse()
+        
+        for i,feat in enumerate(tuples):
+            print (feat[0],feat[1],my_dict[feat[0]])
+            if i < 100:
+                my_dict[feat[0]] = 1
+            else:
+                my_dict[feat[0]] = 0                
+                del hdf[feat[0]]
+                del hdf2[feat[0]]        
+        with open('my_dict.json', 'w') as f:
+            json.dump(my_dict, f)
+
+        #print("Print table again!")
+        hdf_filename = 'tmp.h5'
+        os.system('rm '+hdf_filename)
+        hdf.to_hdf('tmp.h5','train')
+        hdf2.to_hdf('tmp.h5','test')
+        
         
 class TablePage(tk.Frame):
 
@@ -295,6 +342,7 @@ class TablePage(tk.Frame):
         hdf = pd.read_hdf(fnameHDF_full+'.h5')
 
         labels = [x for i,x in enumerate(list(hdf.keys())) if fstatus[i] == 1 ]
+        print('nfeatures=',len(labels))
         print('features=',labels)
         for l in labels:
             feat = hdf[l]

@@ -17,6 +17,9 @@ from matplotlib import rc
 from conf_mat_pl import make_conf_mat_plots_rowcolnormonly
 from conf_mat_pl import make_conf_mat_plots_raw
 from scipy import stats
+from xgboost.sklearn import XGBModel
+from xgboost.core import Booster
+
 
 def readCSV(fname):
     start_time = time.time()
@@ -81,8 +84,13 @@ def readDataHDFBlock(fname,tindex):
     hdf = pd.read_hdf(fname+'.h5')
 
     block = []
+    with open('my_dict.json') as f:
+        my_dict = json.load(f)
+            
     for i in range(tindex*20,(tindex+1)*20):
         feat = [hdf.columns[i]]
+        #if my_dict[feat[0]] == 0: continue
+        #print(feat)
         pfeat = np.array(((hdf[hdf.columns[i]])))
         where_are_NaNs = np.isnan(pfeat)
         pfeat[where_are_NaNs] = 0
@@ -180,10 +188,11 @@ def init_status(fname):
         status.append(my_dict[c])
 
     #print('status=',len(my_dict),sz)
-        
+    print(status)
     return status
 
 def update_status(fname,status):
+    print(status)
     hdf = pd.read_hdf(fname+'.h5')
     with open('my_dict.json') as f:
         my_dict = json.load(f)
@@ -216,40 +225,29 @@ class Feature():
         self.status = 0 
 
 def boosted(num_round):
-    ## TRAINING DATASET
     hdf = pd.read_hdf('tmp.h5','train')
     cat = pd.DataFrame(hdf['class'])
     del hdf['class']
 
-    hdf['weight'] = 0
-    for c in hdf.columns:
-        hdf['weight'] = hdf['weight'] + ((hdf[c] - hdf[c].mean())/hdf[c].std(ddof=0) < 3)
-    wei = pd.DataFrame(hdf['weight'])
-    weig = [x[0] for x in wei.values]
-    #print((weig))
-    del hdf['weight']
+    #hdf['weight'] = 1
+    #for c in hdf.columns:
+    #    hdf['weight'] = hdf['weight'] * ((hdf[c] - hdf[c].mean())/hdf[c].std(ddof=0) < 3)
+    #wei = pd.DataFrame(hdf['weight'])
+    #weig = [x[0] for x in wei.values]
+    #del hdf['weight']
+    #hdf.head()
     dtrain = xgb.DMatrix(hdf,cat)#, weight=weig)
-
-    ## TESTING DATASET
+    #dtrain.set_weight(weig)
     hdf = pd.read_hdf('tmp.h5','test')
     cat = pd.DataFrame(hdf['class'])
     del hdf['class']
-    
-    hdf['weight'] = 0
-    for c in hdf.columns:
-        hdf['weight'] = hdf['weight'] + ((hdf[c] - hdf[c].mean())/hdf[c].std(ddof=0) < 3)
-    wei = pd.DataFrame(hdf['weight'])
-    weig = [x[0] for x in wei.values]
-    #print((weig))
-    del hdf['weight']
-
-    dtest = xgb.DMatrix(hdf,cat)#, weight=weig)
+    dtest = xgb.DMatrix(hdf,cat)
     
     print("Labels")
     print(len(dtrain.get_label()))
     print(len(dtest.get_label()))
     # specify parameters via map, definition are same as c++ version
-    param = {'max_depth':6, 'eta':0.3, 'silent':1, 'objective':'multi:softmax', 'num_class':3, 'eval_metric':['merror','mlogloss']}
+    param = {'max_depth':50, 'eta':0.3, 'silent':1, 'objective':'multi:softmax', 'num_class':3, 'eval_metric':['merror','mlogloss']}
     #param = {'max_depth':10, 'eta':0.1, 'silent':1, 'objective':'reg:linear'}
     
     # specify validations set to watch performance
@@ -271,8 +269,10 @@ def boosted(num_round):
 def plot_importance(bst):
     if bst == None:
         print('Boost first!')
-        return 0
-    ax = xgb.plot_importance(bst, max_num_features=10)
+        #return 0
+
+    get_importance(bst)
+    ax = xgb.plot_importance(bst, max_num_features=20)
     fig = ax.figure
 
     f_imp = open('important_features.txt','w')
@@ -317,3 +317,25 @@ def plot_confusion_matrix(matrix):
     fig = make_conf_mat_plots_raw(matrix, plot_type)
     return fig
     
+def get_importance(booster):
+    importance_type='weight'
+    try:
+        import matplotlib.pyplot as plt
+    except ImportError:
+        raise ImportError('You must install matplotlib to plot importance')
+
+    if isinstance(booster, XGBModel):
+        importance = booster.get_booster().get_score(importance_type=importance_type)
+    elif isinstance(booster, Booster):
+        importance = booster.get_score(importance_type=importance_type)
+    elif isinstance(booster, dict):
+        importance = booster
+    else:
+        raise ValueError('tree must be Booster, XGBModel or dict instance')
+
+    if len(importance) == 0:
+        raise ValueError('Booster.get_score() results in empty')
+
+    tuples = [(k, importance[k]) for k in importance]
+    tuples = sorted(tuples, key=lambda x: x[1])
+    return tuples

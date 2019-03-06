@@ -5,7 +5,7 @@ import pandas as pd
 
 def data_status():
     c_data = ROOT.TChain("NukeCCQETwoTrack");
-    c_data.Add("/Users/hmrbrtzero/Desktop/work/MINERvA/pruned_NukeCCQETwoTrack_minerva_run00022000-00022010.root");
+    c_data.Add("/Users/hmrbrtzero/Desktop/work/MINERvA/prunedFiles/pruned_NukeCCQETwoTrack_minerva_run00022000-00022010.root");
 
     hdf = pd.read_hdf('test_5k.h5')
     
@@ -73,9 +73,34 @@ def compare_best_features():
         h_mc = 0
         c3 = 0
         
+def print_datasets(fname):
+    hdf = pd.read_hdf('tmp.h5','train')
+    feats = [x.replace('NCTT','NukeCCQETwoTrack') for x in hdf.columns[:20]]
+    for feat in feats:
+        l2 = (feat[:-2]+'['+feat[-1]+']')
+        print l2
+    c = ROOT.TChain('NukeCCQETwoTrack')
+    c.Add(fname)
+    return 0
+    for e in c:
+        for feat in feats:
+            l2 = (feat[:-2]+'['+feat[-1]+']')
+            #print l2
+            #if not isinstance('e.'+l2, int): l2 = l2[:-3]
+            #print l2
+            try:
+                x = eval('e.'+l2)
+            except:
+                #print 'No'
+                l2 = l2[:-3]
+                x = eval('e.'+l2)
+            print x
+                
 def main():
-    compare_best_features()
-
+    #compare_best_features()
+    data_status()
+    #print_datasets('/Users/hmrbrtzero/Desktop/work/MINERvA/prunedFiles/pruned_minerva_00126240-00126241.root')
+    
 if __name__ == "__main__":
     main()
 

@@ -4,21 +4,39 @@ import scipy.sparse
 import pickle
 import xgboost as xgb
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def main():
 
-    dtrain = xgb.DMatrix('prunedDump.csv?format=csv&label_column=0')
-    dtest = xgb.DMatrix('prunedDump.csv?format=csv&label_column=0')
+    #dtrain = xgb.DMatrix('prunedDump.csv?format=csv&label_column=0')
+    #dtest = xgb.DMatrix('prunedDump.csv?format=csv&label_column=0')
+    
+    hdf = pd.read_hdf('tmp.h5',where = ['index<50000'])
+    cat = pd.DataFrame(hdf['class'])
+    #print([x for x in list(hdf.keys()) if 'genie' in x])
+    bad_keys = ['genie_n_heavy_baryons_0', 'genie_n_kaons_0', 'genie_n_mesons_0', 'genie_n_muons_0', 'genie_n_neutrinos_0', 'genie_n_neutrons_0', 'genie_n_others_0', 'genie_n_particles_0', 'genie_n_photons_0', 'genie_n_pi_zeros_0', 'genie_n_pions_0', 'genie_n_protons_0']
+    #for k in bad_keys:
+    #    del hdf[k]        
+    
+    del hdf['class']
+    dtrain = xgb.DMatrix(hdf,cat)
+    hdf = pd.read_hdf('tmp.h5',where = ['index>50000'])
+    cat = pd.DataFrame(hdf['class'])
+    #for k in bad_keys:
+    #    del hdf[k]        
+    del hdf['class']
+    dtest = xgb.DMatrix(hdf,cat)
     
     print("Labels")
     print(dtrain.get_label())
+    print(dtest.get_label())
     # specify parameters via map, definition are same as c++ version
     param = {'max_depth':6, 'eta':0.3, 'silent':1, 'objective':'multi:softmax', 'num_class':3, 'eval_metric':['merror','mlogloss']}
     #param = {'max_depth':10, 'eta':0.1, 'silent':1, 'objective':'reg:linear'}
     
     # specify validations set to watch performance
     watchlist = [(dtest, 'eval'), (dtrain, 'train')]
-    num_round = 10
+    num_round = 25
     bst = xgb.train(param, dtrain, num_round, watchlist)
     
     # this is prediction
@@ -41,15 +59,15 @@ def main():
     print('accuracy=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == int(labels[i])) / float(len(preds))))
     #plt.show()
 
-    print('0,0=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 0)))
-    print('0,1=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 1)))
-    print('0,2=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 2)))
-    print('1,0=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 0)))
-    print('1,1=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 1)))
-    print('1,2=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 2)))
-    print('2,0=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 0)))
-    print('2,1=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 1)))
-    print('2,2=%f' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 2)))
+    print('0,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 0)))
+    print('0,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 1)))
+    print('0,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 0 and  int(labels[i]) == 2)))
+    print('1,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 0)))
+    print('1,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 1)))
+    print('1,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 1 and  int(labels[i]) == 2)))
+    print('2,0=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 0)))
+    print('2,1=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 1)))
+    print('2,2=%d' % (sum(1 for i in range(len(preds)) if int(preds[i]) == 2 and  int(labels[i]) == 2)))
 
     
 if __name__ == "__main__":
